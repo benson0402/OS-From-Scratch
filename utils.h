@@ -1,6 +1,7 @@
 #pragma once
 
 #include "kernel.h"
+#include "sbi.h"
 
 // Variadic Function Builtins - Clang
 // ref: https://clang.llvm.org/docs/LanguageExtensions.html#variadic-function-builtins
@@ -11,7 +12,5 @@
 
 
 void *memset(void *buf, uint8_t val, size_t n);
-
 const char *itoa(int val);
-
 void printf(const char *fmt, ...);
