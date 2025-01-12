@@ -26,6 +26,9 @@ void kernel_main(void) {
   printf("1 + 2 = %d, %x\n", 1 + 2, 0x1234abcd);
   printf("MAX_INT = %d, MIN_INT = %d\n", 2147483647, -2147483648);
 
+  PANIC("booted!\n");
+  printf("no printed");
+
   for (;;) {
     __asm__ __volatile__("wfi"); // Wait For Interrupt
   }
