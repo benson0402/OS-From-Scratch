@@ -4,6 +4,7 @@
 
 extern uint8_t __bss[], __bss_end[], __stack_top[];
 
+
 __attribute__((section(".text.boot")))
 __attribute__((naked))
 void boot(void) {
@@ -15,9 +16,9 @@ void boot(void) {
   );
 }
 
+
 void kernel_main(void) {
   // Clear the .bss section (Block Started by Symbol)
-  // global var ...
   memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
 
   // Example printf usage
@@ -29,4 +30,3 @@ void kernel_main(void) {
     __asm__ __volatile__("wfi"); // Wait For Interrupt
   }
 }
-
