@@ -7,6 +7,12 @@ extern uint8_t __bss[], __bss_end[], __stack_top[];
 extern uint8_t __heap_start[], __heap_end[];
 
 
+/*
+ *
+ * Memeory Allocation
+ *
+ */
+
 paddr_t alloc_pages(uint32_t n) {
   static paddr_t next_paddr = (paddr_t) __heap_start;
   paddr_t paddr = next_paddr;
@@ -21,6 +27,100 @@ paddr_t alloc_pages(uint32_t n) {
 }
 
 
+/*
+ *
+ * Process
+ *
+ */
+
+__attribute__((naked))
+void switch_context(uint32_t *prev_sp, uint32_t *next_sp) {
+  __asm__ __volatile__(
+    // Save callee-saved registers 
+    "addi sp, sp, 4 * -13\n"
+    "sw ra, 4 * 0(sp)\n"
+    "sw s0, 4 * 1(sp)\n"
+    "sw s1, 4 * 2(sp)\n"
+    "sw s2, 4 * 3(sp)\n"
+    "sw s3, 4 * 4(sp)\n"
+    "sw s4, 4 * 5(sp)\n"
+    "sw s5, 4 * 6(sp)\n"
+    "sw s6, 4 * 7(sp)\n"
+    "sw s7, 4 * 8(sp)\n"
+    "sw s8, 4 * 9(sp)\n"
+    "sw s9, 4 * 10(sp)\n"
+    "sw s10, 4 * 11(sp)\n"
+    "sw s11, 4 * 12(sp)\n"
+
+    // switch stack pointer
+    "sw sp, (a0)\n"
+    "lw sp, (a1)\n"
+    
+    // Restore callee-saved registers
+    "lw ra, 4 * 0(sp)\n"
+    "lw s0, 4 * 1(sp)\n"
+    "lw s1, 4 * 2(sp)\n"
+    "lw s2, 4 * 3(sp)\n"
+    "lw s3, 4 * 4(sp)\n"
+    "lw s4, 4 * 5(sp)\n"
+    "lw s5, 4 * 6(sp)\n"
+    "lw s6, 4 * 7(sp)\n"
+    "lw s7, 4 * 8(sp)\n"
+    "lw s8, 4 * 9(sp)\n"
+    "lw s9, 4 * 10(sp)\n"
+    "lw s10, 4 * 11(sp)\n"
+    "lw s11, 4 * 12(sp)\n"
+    "addi sp, sp, 4 * 13\n"
+    "ret\n"
+  );
+}
+
+struct process procs[PROCS_MAX];
+
+struct process *create_process(uint32_t pc) {
+  // Find an unused process controll block.
+  
+  struct process *proc = NULL;
+  int pid = 0;
+  for(int i = 0; i < PROCS_MAX; ++i) {
+    if(procs[i].state == PROC_UNUSED) {
+      pid = i + 1;
+      proc = &procs[i];
+      break;
+    }
+  }
+
+  if(proc == NULL)
+    PANIC("no free process slots");
+
+  uint32_t *sp = (uint32_t *) &proc->stack[sizeof(proc->stack)];
+  *--sp = 0; // s11
+  *--sp = 0; // s10
+  *--sp = 0; // s9
+  *--sp = 0; // s8
+  *--sp = 0; // s7
+  *--sp = 0; // s6
+  *--sp = 0; // s5
+  *--sp = 0; // s4
+  *--sp = 0; // s3
+  *--sp = 0; // s2
+  *--sp = 0; // s1
+  *--sp = 0; // s0
+  *--sp = pc; // ra
+  proc->sp = (uint32_t) sp;
+  
+  proc->state = PROC_RUNNABLE;
+  proc->pid = pid;
+  proc->sp = (uint32_t) sp;
+  return proc;
+}
+
+/*
+ *
+ * Kernel Trap
+ *
+ */
+
 void trap_handler(struct trap_frame *frame) {
   uint32_t scause = READ_CSR(scause);
   uint32_t stval = READ_CSR(stval);
@@ -29,7 +129,6 @@ void trap_handler(struct trap_frame *frame) {
   PANIC("unexpected trap scause=%x, stval=%x, sepc=%x, a0=%d\n",
         scause, stval, sepc, frame->a0);
 }
-
 
 __attribute__((naked))
 __attribute__((aligned(4)))
@@ -109,6 +208,38 @@ void trap_entry(void) {
 }
 
 
+/*
+ *
+ * Kernel Main
+ *
+ */
+
+void delay(void) {
+  for(int i = 0; i < 1000000000; ++i) {
+    __asm__ __volatile__("nop");
+  }
+}
+
+struct process *proc_a, *proc_b;
+
+void proc_a_main(void) {
+  printf("start proc_a\n");
+  while(1) {
+    printf("proc_a\n");
+    switch_context(&proc_a->sp, &proc_b->sp);
+    delay();
+  }
+}
+
+void proc_b_main(void) {
+  printf("start proc_b\n");
+  while(1) {
+    printf("proc_b\n");
+    switch_context(&proc_b->sp, &proc_a->sp);
+    delay();
+  }
+}
+
 void kernel_main(void) {
   // Clear the .bss section (Block Started by Symbol)
   memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
@@ -128,7 +259,11 @@ void kernel_main(void) {
   printf("alloc_pages test: paddr0=%x\n", paddr0);
   printf("alloc_pages test: paddr1=%x\n", paddr1);
 
-
+  // Test Process Switching
+  proc_a = create_process((uint32_t) proc_a_main);
+  proc_b = create_process((uint32_t) proc_b_main);
+  proc_a_main();
+  
   // Test Exception Handler  
   __asm__ __volatile__("unimp"); // illegal instruction
 

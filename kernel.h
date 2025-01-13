@@ -2,7 +2,7 @@
 
 #include "utils.h"
 
-#define PAGE_SIZE 4096
+typedef int bool;
 
 typedef unsigned char       uint8_t;
 typedef unsigned short      uint16_t;
@@ -12,12 +12,29 @@ typedef uint32_t            size_t;
 typedef uint32_t            paddr_t;
 typedef uint32_t            vaddr_t;
 
+#define true  1
+#define false 0
+#define NULL  ((void *)(0))
+
+// Alignment Builtins
+// ref: https://clang.llvm.org/docs/LanguageExtensions.html#alignment-builtins
+#define align_up(val, align)    __builltin_align_up(val, align)
+#define is_aligned(val, align)  __builltin_is_aligned(val, align)
+#define offsetof(val, align)    __builltin_offsetof(val, align)
+
+
 #define PANIC(fmt, ...)                                                    \
   do {                                                                     \
     printf("PANIC: %s:%d: " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__);  \
     while (1) {}                                                           \
   } while (0)
 
+
+/*
+ *
+ * Exception Handler
+ *
+ */
 
 struct trap_frame {
   uint32_t ra;
@@ -65,3 +82,30 @@ struct trap_frame {
     unsigned long __tmp = (val); \
     __asm__ __volatile__("csrw " #reg ", %0" :: "r"(__tmp)); \
   } while(0)
+
+/*
+ *
+ * Memory Management
+ *
+ */
+
+#define PAGE_SIZE 4096
+
+
+/*
+ *
+ * Process
+ *
+ */
+
+#define PROCS_MAX 8
+
+#define PROC_UNUSED 0
+#define PROC_RUNNABLE 1
+
+struct process {
+  int pid;
+  int state;
+  vaddr_t sp;
+  uint8_t stack[8192];
+};
