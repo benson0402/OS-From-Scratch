@@ -26,4 +26,10 @@ SECTIONS {
   . =  ALIGN(4);
   . += 128 * 1024; /* 128 KB */
   __stack_top = .;
+
+  /* heap allocation */
+  . = ALIGN(4096); /* A page = 4KB */
+  __heap_start = .;
+  . += 64 * 1024 * 1024; /* 64 MB */
+  __heap_end = .;
 }

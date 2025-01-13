@@ -4,6 +4,22 @@
 
 extern uint8_t __bss[], __bss_end[], __stack_top[];
 
+extern uint8_t __heap_start[], __heap_end[];
+
+
+paddr_t alloc_pages(uint32_t n) {
+  static paddr_t next_paddr = (paddr_t) __heap_start;
+  paddr_t paddr = next_paddr;
+  next_paddr += n * PAGE_SIZE;
+
+  if(next_paddr > (paddr_t) __heap_end) {
+    PANIC("Out of heap");
+  }
+
+  memset((void *) paddr, 0, n * PAGE_SIZE);
+  return paddr;
+}
+
 
 void trap_handler(struct trap_frame *frame) {
   uint32_t scause = READ_CSR(scause);
@@ -100,11 +116,17 @@ void kernel_main(void) {
   // Set Exception Handler (Supervisor Trap Vector)
   WRITE_CSR(stvec, (uint32_t) trap_entry);
 
-
   // Example printf usage
   printf("\n\nHello %s \n", "World!");
   printf("1 + 2 = %d, %x\n", 1 + 2, 0x1234abcd);
   printf("MAX_INT = %d, MIN_INT = %d\n", 2147483647, -2147483648);
+
+  // Test Allocate Pages
+  paddr_t paddr0 = alloc_pages(2);
+  paddr_t paddr1 = alloc_pages(1);
+
+  printf("alloc_pages test: paddr0=%x\n", paddr0);
+  printf("alloc_pages test: paddr1=%x\n", paddr1);
 
 
   // Test Exception Handler  
