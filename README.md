@@ -13,7 +13,8 @@ The main goal of this project is to understand the basic concepts of operating s
 - [x] Simple exception handler
 - [x] Simple Memory Allocation (allocate pages)
 - [x] Process Control Block (PCB) and Context Switching
-- [ ] Simple Scheduler
+- [x] Simple Scheduler
+- [ ] Page Table
 
 
 
