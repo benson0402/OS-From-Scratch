@@ -33,8 +33,10 @@ paddr_t alloc_pages(uint32_t n) {
  *
  */
 
+struct process procs[PROCS_MAX]; 
+
 __attribute__((naked))
-void switch_context(uint32_t *prev_sp, uint32_t *next_sp) {
+void context_switch(uint32_t *prev_sp, uint32_t *next_sp) {
   __asm__ __volatile__(
     // Save callee-saved registers 
     "addi sp, sp, 4 * -13\n"
@@ -75,8 +77,6 @@ void switch_context(uint32_t *prev_sp, uint32_t *next_sp) {
   );
 }
 
-struct process procs[PROCS_MAX];
-
 struct process *create_process(uint32_t pc) {
   // Find an unused process controll block.
   
@@ -115,9 +115,42 @@ struct process *create_process(uint32_t pc) {
   return proc;
 }
 
+struct process *current_proc;
+struct process *idle_proc;
+
+void yield(void) {
+
+  if(current_proc == NULL)
+    return;
+
+  // Search for a runnable process
+  struct process *next = idle_proc;
+  for(int i = 0; i < PROCS_MAX; i++) {
+    int next_id = (current_proc->pid + i) % PROCS_MAX;
+    struct process *proc = &procs[next_id];
+    if(proc->state == PROC_RUNNABLE && proc->pid > 0) {
+      next = proc;
+      break;
+    }
+  }
+  
+  if(next == current_proc)
+    return;
+
+  __asm__ __volatile__(
+    "csrw sscratch, %[sscratch]\n"
+    :
+    : [sscratch] "r" ((uint32_t) &next->stack[sizeof(next->stack)])
+  );
+
+  struct process *pre = current_proc;
+  current_proc = next;
+  context_switch(&pre->sp, &next->sp);
+}
+
 /*
  *
- * Kernel Trap
+ * Kernel Trap (Exception Handler)
  *
  */
 
@@ -134,7 +167,9 @@ __attribute__((naked))
 __attribute__((aligned(4)))
 void trap_entry(void) {
   __asm__ __volatile__(
-    "csrw sscratch, sp\n"
+    // Retrieve the kernel stack of the running process from sscratch
+    "csrrw sp, sscratch, sp\n"
+
     "addi sp, sp, -4 * 31\n"
     "sw ra, 4 * 0(sp)\n"
     "sw gp, 4 * 1(sp)\n"
@@ -166,10 +201,15 @@ void trap_entry(void) {
     "sw s9, 4 * 27(sp)\n"
     "sw s10, 4 * 28(sp)\n"
     "sw s11, 4 * 29(sp)\n"
-    
+
+    // Retrieve and save the sp at the time of exception.
     "csrr a0, sscratch\n" 
     "sw a0, 4 * 30(sp)\n" // store original sp address
     
+    // Reset the kernel stack.
+    "addi a0, sp, 4 * 31\n"
+    "csrw sscratch, a0\n"
+
     "mv a0, sp\n"
     "call trap_handler\n"
 
@@ -223,19 +263,21 @@ void delay(void) {
 struct process *proc_a, *proc_b;
 
 void proc_a_main(void) {
+  int t = 5;
   printf("start proc_a\n");
-  while(1) {
+  while(t--) {
     printf("proc_a\n");
-    switch_context(&proc_a->sp, &proc_b->sp);
+    yield();
     delay();
   }
 }
 
 void proc_b_main(void) {
+  int t = 5;
   printf("start proc_b\n");
-  while(1) {
+  while(t--) {
     printf("proc_b\n");
-    switch_context(&proc_b->sp, &proc_a->sp);
+    yield();
     delay();
   }
 }
@@ -246,6 +288,12 @@ void kernel_main(void) {
 
   // Set Exception Handler (Supervisor Trap Vector)
   WRITE_CSR(stvec, (uint32_t) trap_entry);
+
+  // Process Initalization
+  idle_proc = create_process((uint32_t) NULL); 
+  idle_proc->pid = -1;
+  current_proc = idle_proc;
+  
 
   // Example printf usage
   printf("\n\nHello %s \n", "World!");
@@ -262,8 +310,11 @@ void kernel_main(void) {
   // Test Process Switching
   proc_a = create_process((uint32_t) proc_a_main);
   proc_b = create_process((uint32_t) proc_b_main);
-  proc_a_main();
   
+
+  yield();
+  PANIC("switched back to idle process");
+
   // Test Exception Handler  
   __asm__ __volatile__("unimp"); // illegal instruction
 
