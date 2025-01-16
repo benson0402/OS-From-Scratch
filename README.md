@@ -1,6 +1,21 @@
 # OS From Scratch
 
-This is a project to build a simple operating system from scratch. The goal is to learn how an operating system works and how to build one from scratch.
+The project is based on the [Operating System in 1000 lines](https://operating-system-in-1000-lines.vercel.app/en/) which used RISC-V architecture, implemented in C and tested on QEMU.
+
+The main goal of this project is to understand the basic concepts of operating system and implement it from scratch.
+
+## Implementaed Features
+
+- [x] Bootloader (OpenSBI)
+- [x] printf function (UART)
+- [x] Some basic string functions (strcpy, strcmp, etc.)
+- [x] Kernel Panic Macro
+- [x] Simple exception handler
+- [x] Simple Memory Allocation (allocate pages)
+- [x] Process Control Block (PCB) and Context Switching
+- [ ] Simple Scheduler
+
+
 
 ## References
 
