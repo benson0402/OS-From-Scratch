@@ -18,9 +18,9 @@ typedef uint32_t            vaddr_t;
 
 // Alignment Builtins
 // ref: https://clang.llvm.org/docs/LanguageExtensions.html#alignment-builtins
-#define align_up(val, align)    __builltin_align_up(val, align)
-#define is_aligned(val, align)  __builltin_is_aligned(val, align)
-#define offsetof(val, align)    __builltin_offsetof(val, align)
+#define align_up(val, align)    __builtin_align_up(val, align)
+#define is_aligned(val, align)  __builtin_is_aligned(val, align)
+#define offsetof(val, align)    __builtin_offsetof(val, align)
 
 // Variadic Function Builtins
 // ref: https://clang.llvm.org/docs/LanguageExtensions.html#variadic-function-builtins

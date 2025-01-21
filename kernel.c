@@ -29,11 +29,41 @@ paddr_t alloc_pages(uint32_t n) {
 
 /*
  *
+ * Page Table
+ *
+ */
+
+void map_page(uint32_t *table1, uint32_t vaddr, paddr_t paddr, uint32_t flags) {
+  if(!is_aligned(vaddr, PAGE_SIZE))    
+    PANIC("unaligned vaadr %x", vaddr);
+  if(!is_aligned(paddr, PAGE_SIZE))
+    PANIC("unaligned paddr %x", paddr);
+
+  uint32_t vpn1 = (vaddr >> 22) & 0x3ff; // 10 bits
+  uint32_t vpn0 = (vaddr >> 12) & 0x3ff; // 10 bits
+  
+  if((table1[vpn1] & PAGE_V) == 0) {
+    // need to allocate table0 page 
+    
+    uint32_t pt_paddr = alloc_pages(1); // page table address
+    
+    // (pg_addr / PAGE_SIZE) is Physical Page Number (PPN) for second level page(table0)
+    table1[vpn1] = ((pt_paddr / PAGE_SIZE) << 10) | PAGE_V; // Sv32 format
+  }
+  
+  uint32_t *table0 = (uint32_t *) ((table1[vpn1] >> 10) * PAGE_SIZE);
+  table0[vpn0] = ((paddr / PAGE_SIZE) << 10) | flags | PAGE_V; // map to physical addr
+}
+
+
+/*
+ *
  * Process
  *
  */
 
 struct process procs[PROCS_MAX]; 
+extern char __kernel_base[];
 
 __attribute__((naked))
 void context_switch(uint32_t *prev_sp, uint32_t *next_sp) {
@@ -84,7 +114,7 @@ struct process *create_process(uint32_t pc) {
   int pid = 0;
   for(int i = 0; i < PROCS_MAX; ++i) {
     if(procs[i].state == PROC_UNUSED) {
-      pid = i + 1;
+      pid = i;
       proc = &procs[i];
       break;
     }
@@ -108,10 +138,18 @@ struct process *create_process(uint32_t pc) {
   *--sp = 0; // s0
   *--sp = pc; // ra
   proc->sp = (uint32_t) sp;
+
+  // Map kernel pages
+  uint32_t *page_table = (uint32_t *) alloc_pages(1);
+  for (paddr_t paddr = (paddr_t) __kernel_base;
+      paddr < (paddr_t) __heap_end; paddr += PAGE_SIZE)
+    map_page(page_table, paddr, paddr, PAGE_R | PAGE_W | PAGE_X);
   
+
   proc->state = PROC_RUNNABLE;
-  proc->pid = pid;
+  proc->pid = pid + 1;
   proc->sp = (uint32_t) sp;
+  proc->page_table = page_table;
   return proc;
 }
 
@@ -138,15 +176,23 @@ void yield(void) {
     return;
 
   __asm__ __volatile__(
+    "sfence.vma\n" // Clear the TLB (Supervisor Fence Virtual Memory Address)
+    "csrw satp, %[satp]\n"
+    "sfence.vma\n"
     "csrw sscratch, %[sscratch]\n"
     :
-    : [sscratch] "r" ((uint32_t) &next->stack[sizeof(next->stack)])
+    : [satp] "r" (SATP_SV32 | ((uint32_t) next->page_table / PAGE_SIZE)),
+      [sscratch] "r" ((uint32_t) &next->stack[sizeof(next->stack)])
   );
 
   struct process *pre = current_proc;
   current_proc = next;
   context_switch(&pre->sp, &next->sp);
 }
+
+
+
+
 
 /*
  *

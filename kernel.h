@@ -18,9 +18,9 @@ typedef uint32_t            vaddr_t;
 
 // Alignment Builtins
 // ref: https://clang.llvm.org/docs/LanguageExtensions.html#alignment-builtins
-#define align_up(val, align)    __builltin_align_up(val, align)
-#define is_aligned(val, align)  __builltin_is_aligned(val, align)
-#define offsetof(val, align)    __builltin_offsetof(val, align)
+#define align_up(val, align)    __builtin_align_up(val, align)
+#define is_aligned(val, align)  __builtin_is_aligned(val, align)
+#define offsetof(val, align)    __builtin_offsetof(val, align)
 
 
 #define PANIC(fmt, ...)                                                    \
@@ -85,7 +85,7 @@ struct trap_frame {
 
 /*
  *
- * Memory Management
+ * Memory Allocation
  *
  */
 
@@ -107,5 +107,20 @@ struct process {
   int pid;
   int state;
   vaddr_t sp;
+  uint32_t *page_table;
   uint8_t stack[8192];
 };
+
+
+/*
+ *
+ * Page Table
+ *
+ */
+
+#define SATP_SV32 (1u << 31)  // indicates "enable paging in Sv32 mode" in satp reg 
+#define PAGE_V    (1 << 0)    // Valid bit (entry is enabled)
+#define PAGE_R    (1 << 1)    // Readble
+#define PAGE_W    (1 << 2)    // Writable
+#define PAGE_X    (1 << 3)    // Executable
+#define PAGE_U    (1 << 4)    // User (accessible in user mode)
